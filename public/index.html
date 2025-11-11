@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LEMP-demo</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.6; }
+    .card { max-width: 760px; padding: 1.5rem; border: 1px solid #9993; border-radius: 14px; }
+    button { padding: .6rem 1rem; border-radius: 10px; border: 1px solid #9996; cursor: pointer; }
+    .muted { color: #666; font-size: .95rem; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>👋 Tervetuloa LEMP-demo-sivulle</h1>
+    <p>Tämä sivu palvelee <strong>Nginxillä</strong> ja hakee kellonajan <strong>SQL-palvelimelta</strong>.</p>
+
+    <h2>SQL-palvelimen kellonaika</h2>
+    <p><span id="dbtime" class="muted">Ladataan…</span></p>
+    <p><button id="refresh">Päivitä aika</button></p>
+
+    <hr>
+    <p class="muted">Personoi tätä tekstiä myöhemmin (värit, kuva, tms.).</p>
+    <p class="muted">Lähdekoodi: <a href="https://github.com/USER/REPO" target="_blank" rel="noopener">GitHub (public)</a></p>
+  </main>
+
+  <script>
+    async function loadTime() {
+      const el = document.getElementById('dbtime');
+      try {
+        const res = await fetch('dbtime.php', { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        el.textContent = data.time ?? JSON.stringify(data);
+      } catch (err) {
+        el.textContent = 'Virhe kellonajassa: ' + err.message + ' (tee dbtime.php valmiiksi)';
+      }
+    }
+    document.getElementById('refresh').addEventListener('click', loadTime);
+    loadTime();
+  </script>
+</body>
+</html>
