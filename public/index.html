@@ -1,34 +1,33 @@
-<!doctype html> <html lang="fi"> <head>
+<!doctype html>
+<html lang="fi">
+<head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LEMP-demo – SQL-kello</title>
   <style>
     :root { color-scheme: light dark; }
     html, body { height: 100%; margin: 0; }
-    body { font-family: system-ui, Segoe UI, Roboto, sans-serif; overflow: hidden; 
-}
-    /* Matrix-taustacanvas */
-    #matrix-canvas {
-      position: fixed; inset: 0; z-index: 0;
-      background: #000; display: block;
-    }
-    /* Sisältö kortissa, taustan päällä */
-    .content {
-      position: relative; z-index: 1;
-      min-height: 100%; display: grid; place-items: center;
-      padding: 2rem;
-    }
+    body { font-family: system-ui, Segoe UI, Roboto, sans-serif; overflow: hidden; background:#0b0f0c; }
+
+    /* Matrix-tausta */
+    #matrix-canvas { position: fixed; inset: 0; z-index: 0; background: #000; display: block; }
+
+    /* Sisältö */
+    .content { position: relative; z-index: 1; min-height: 100%; display: grid; place-items: center; padding: 2rem; }
     .card {
-      width: min(720px, 92vw);
+      width: min(760px, 92vw);
       background: rgba(0,0,0,0.45);
       backdrop-filter: blur(6px);
       color: #c8facc;
       border: 1px solid rgba(0,255,120,0.25);
-      border-radius: 16px; padding: 1.6rem 1.8rem;
+      border-radius: 18px;
+      padding: 1.6rem 1.8rem;
       box-shadow: 0 10px 30px rgba(0,0,0,.35);
     }
     h1 { margin: 0 0 .75rem; font-weight: 700; letter-spacing: .3px; }
     .muted { color: #9ee6a3; opacity: .9; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
     /* Digitaalinen kello */
     .clock {
       font-variant-numeric: tabular-nums;
@@ -38,7 +37,8 @@
       margin: .2rem 0 1.2rem;
       text-shadow: 0 0 12px rgba(0,255,120,.55);
     }
-    /* GitHub-nappi */
+
+    /* Nappi */
     .btn {
       display: inline-block; padding: .7rem 1.1rem;
       border-radius: 12px; border: 1px solid rgba(0,255,120,.35);
@@ -48,102 +48,99 @@
     }
     .btn:hover { transform: translateY(-1px); background: rgba(0,255,120,0.18); }
     .row { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
-}
-  </style> </head> <body>
+
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      #matrix-canvas { display: none; }
+      .card { background: #0b1e12; }
+    }
+  </style>
+</head>
+<body>
   <canvas id="matrix-canvas" aria-hidden="true"></canvas>
+
   <div class="content">
     <div class="card">
       <h1>SQL-palvelimen aika (Suomi)</h1>
-      <div id="clock" class="clock">--:--:--</div>
+      <div id="clock" class="clock" role="timer" aria-live="polite" aria-atomic="true">--:--:--</div>
       <div class="row">
-        <a class="btn" href="https://github.com/luikkutuikku/lemp-site" 
-target="_blank" rel="noopener">
-          Avaa GitHub-repo
-        </a>
+        <a class="btn" href="https://github.com/luikkutuikku/lemp-site" target="_blank" rel="noopener">Avaa GitHub-repo</a>
         <span class="muted mono" id="status">Synkronoidaan…</span>
       </div>
+
       <p class="muted" style="margin-top:1.2rem;">
-        Sivu käyttää cPoutan MariaDB:tä/ MySQL:ää: <code class="mono">SELECT 
-NOW()</code> → palautetaan JSON-rajapinnasta (<code 
-class="mono">dbtime.php</code>).
-        Kellon näyttö päivittyy sekunnin välein paikallisesti ja resynkkaa 
-palvelimen aikaan säännöllisesti.
+        Sivu hakee ajan MariaDB/MySQL:stä (<code class="mono">SELECT NOW()</code>) → JSON (<code class="mono">dbtime.php</code>).
+        Kello päivittyy sekunnin välein ja resynkkaa säännöllisesti palvelimen aikaan.
       </p>
     </div>
   </div>
+
   <script>
     /* ===== Matrix-tausta ===== */
     (function matrix() {
-      const canvas = document.getElementById('matrix-canvas');
-      const ctx = canvas.getContext('2d');
-      let w, h, cols, drops, fontSize = 16;
-      const glyphs = '01 23456789'.split(''); // numeropainotteinen "sade"
-      function resize() {
-        w = canvas.width = window.innerWidth;
-        h = canvas.height = window.innerHeight;
-        cols = Math.floor(w / fontSize);
-        drops = Array(cols).fill(0).map(() => 
-Math.floor(Math.random()*h/fontSize));
-        ctx.font = fontSize + 'px monospace';
+      const c = document.getElementById('matrix-canvas');
+      const ctx = c.getContext('2d');
+      let w,h,cols,drops,fs=16;
+      const glyphs = '0123456789'.split('');
+      function resize(){ w=c.width=innerWidth; h=c.height=innerHeight; cols=Math.floor(w/fs);
+        drops = Array(cols).fill(0).map(()=>Math.floor(Math.random()*h/fs));
+        ctx.font = fs+'px monospace';
       }
-      window.addEventListener('resize', resize, { passive: true });
-      resize();
-      function draw() {
-        // läpikuultava musta "haamu"jälki
-        ctx.fillStyle = 'rgba(0,0,0,0.08)';
-        ctx.fillRect(0, 0, w, h);
-        ctx.fillStyle = '#00ff80';
-        for (let i = 0; i < cols; i++) {
-          const text = glyphs[Math.floor(Math.random() * glyphs.length)];
-          const x = i * fontSize;
-          const y = drops[i] * fontSize;
-          ctx.fillText(text, x, y);
-          // resetoi pudotus satunnaisesti pohjalla
-          if (y > h && Math.random() > 0.975) drops[i] = 0;
-          else drops[i]++;
+      addEventListener('resize', resize, {passive:true}); resize();
+      (function draw(){
+        ctx.fillStyle='rgba(0,0,0,0.08)'; ctx.fillRect(0,0,w,h);
+        ctx.fillStyle='#00ff80';
+        for(let i=0;i<cols;i++){
+          const x=i*fs, y=drops[i]*fs;
+          ctx.fillText(glyphs[Math.floor(Math.random()*glyphs.length)], x, y);
+          if (y>h && Math.random()>0.975) drops[i]=0; else drops[i]++;
         }
         requestAnimationFrame(draw);
-      }
-      requestAnimationFrame(draw);
+      })();
     })();
-    /* ===== SQL-aikaan synkattu digitaalinen kello ===== */
-    const clockEl = document.getElementById('clock');
-    const statusEl = document.getElementById('status');
-    let offsetMs = 0; // server_time - client_time
-    // Muotoilu HH:MM:SS
-    function fmt(n){ return n.toString().padStart(2,'0'); }
-    function render() {
-      const now = new Date(Date.now() + offsetMs);
-      const hh = fmt(now.getHours()), mm = fmt(now.getMinutes()), ss = 
-fmt(now.getSeconds());
-      clockEl.textContent = `${hh}:${mm}:${ss}`;
-    }
-    async function syncFromServer() {
-      try {
-        statusEl.textContent = 'Synkronoidaan…';
-        const res = await fetch('dbtime.php', { cache: 'no-store' });
-        const data = await res.json();
-        // Jos dbtime.php palauttaa epoch_ms, käytä sitä tarkkaan synkkaan:
-        let serverMs;
-        if (typeof data.epoch_ms === 'number') {
-          serverMs = data.epoch_ms;
-        } else if (typeof data.time === 'string') {
-          // "YYYY-MM-DD HH:MM:SS" → tee siitä paikallinen aika
-          const t = data.time.replace(' ', 'T');
-          serverMs = new Date(t).getTime();
-        } else {
-          throw new Error('Odottamaton vastaus');
-        }
-        offsetMs = serverMs - Date.now();
-        statusEl.textContent = 'Synkronoitu';
-      } catch (e) {
-        statusEl.textContent = 'Synkka epäonnistui: ' + e.message;
+
+    /* ===== SQL-aikaan synkattu kello ===== */
+    document.addEventListener('DOMContentLoaded', () => {
+      const clockEl  = document.getElementById('clock');
+      const statusEl = document.getElementById('status');
+      if (!clockEl) return;
+
+      let offsetMs = 0;
+      const fmt = n => String(n).padStart(2,'0');
+
+      function render(){
+        const now = new Date(Date.now() + offsetMs);
+        clockEl.textContent = `${fmt(now.getHours())}:${fmt(now.getMinutes())}:${fmt(now.getSeconds())}`;
       }
-    }
-    // Ensisynkka ja kellon päivitys
-    syncFromServer();
-    setInterval(render, 1000);
-    // Resynkkaa 2 minuutin välein
-    setInterval(syncFromServer, 120000);
-  </script> </body> </html>
+
+      async function sync(){
+        try {
+          if (statusEl) statusEl.textContent = 'Synkronoidaan…';
+          const res  = await fetch('dbtime.php', { cache: 'no-store' });
+          const text = await res.text();
+          let data;
+          try { data = JSON.parse(text); }
+          catch { console.error('dbtime.php raw:', text); throw new Error('vastauksena ei-JSON'); }
+
+          if (typeof data.epoch_ms === 'number') {
+            offsetMs = data.epoch_ms - Date.now(); // edellyttää että palvelimen tz = Europe/Helsinki
+          } else if (typeof data.time === 'string') {
+            offsetMs = new Date(data.time.replace(' ','T')).getTime() - Date.now();
+          } else {
+            throw new Error('odottamaton vastaus');
+          }
+          if (statusEl) statusEl.textContent = 'Synkronoitu';
+        } catch (e) {
+          if (statusEl) statusEl.textContent = 'Synkka epäonnistui: ' + e.message;
+          console.error('sync error:', e);
+        }
+      }
+
+      render();               // näytä heti
+      setInterval(render, 1000);
+      sync();                 // hae palvelimen aika
+      setInterval(sync, 120000);
+    });
+  </script>
+</body>
+</html>
