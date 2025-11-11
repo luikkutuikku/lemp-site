@@ -1,45 +1,149 @@
-<!doctype html>
-<html lang="fi">
-<head>
+<!doctype html> <html lang="fi"> <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>LEMP-demo</title>
+  <title>LEMP-demo – SQL-kello</title>
   <style>
     :root { color-scheme: light dark; }
-    body { font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.6; }
-    .card { max-width: 760px; padding: 1.5rem; border: 1px solid #9993; border-radius: 14px; }
-    button { padding: .6rem 1rem; border-radius: 10px; border: 1px solid #9996; cursor: pointer; }
-    .muted { color: #666; font-size: .95rem; }
-  </style>
-</head>
-<body>
-  <main class="card">
-    <h1>👋 Tervetuloa LEMP-demo-sivulle</h1>
-    <p>Tämä sivu palvelee <strong>Nginxillä</strong> ja hakee kellonajan <strong>SQL-palvelimelta</strong>.</p>
-
-    <h2>SQL-palvelimen kellonaika</h2>
-    <p><span id="dbtime" class="muted">Ladataan…</span></p>
-    <p><button id="refresh">Päivitä aika</button></p>
-
-    <hr>
-    <p class="muted">Personoi tätä tekstiä myöhemmin (värit, kuva, tms.).</p>
-    <p class="muted">Lähdekoodi: <a href="https://github.com/USER/REPO" target="_blank" rel="noopener">GitHub (public)</a></p>
-  </main>
-
+    html, body { height: 100%; margin: 0; }
+    body { font-family: system-ui, Segoe UI, Roboto, sans-serif; overflow: hidden; 
+}
+    /* Matrix-taustacanvas */
+    #matrix-canvas {
+      position: fixed; inset: 0; z-index: 0;
+      background: #000; display: block;
+    }
+    /* Sisältö kortissa, taustan päällä */
+    .content {
+      position: relative; z-index: 1;
+      min-height: 100%; display: grid; place-items: center;
+      padding: 2rem;
+    }
+    .card {
+      width: min(720px, 92vw);
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(6px);
+      color: #c8facc;
+      border: 1px solid rgba(0,255,120,0.25);
+      border-radius: 16px; padding: 1.6rem 1.8rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    h1 { margin: 0 0 .75rem; font-weight: 700; letter-spacing: .3px; }
+    .muted { color: #9ee6a3; opacity: .9; }
+    /* Digitaalinen kello */
+    .clock {
+      font-variant-numeric: tabular-nums;
+      font-size: clamp(40px, 7vw, 72px);
+      line-height: 1;
+      letter-spacing: 2px;
+      margin: .2rem 0 1.2rem;
+      text-shadow: 0 0 12px rgba(0,255,120,.55);
+    }
+    /* GitHub-nappi */
+    .btn {
+      display: inline-block; padding: .7rem 1.1rem;
+      border-radius: 12px; border: 1px solid rgba(0,255,120,.35);
+      color: #d7ffe0; text-decoration: none; font-weight: 600;
+      transition: transform .08s ease, background .2s ease;
+      background: rgba(0,255,120,0.10);
+    }
+    .btn:hover { transform: translateY(-1px); background: rgba(0,255,120,0.18); }
+    .row { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
+}
+  </style> </head> <body>
+  <canvas id="matrix-canvas" aria-hidden="true"></canvas>
+  <div class="content">
+    <div class="card">
+      <h1>SQL-palvelimen aika (Suomi)</h1>
+      <div id="clock" class="clock">--:--:--</div>
+      <div class="row">
+        <a class="btn" href="https://github.com/luikkutuikku/lemp-site" 
+target="_blank" rel="noopener">
+          Avaa GitHub-repo
+        </a>
+        <span class="muted mono" id="status">Synkronoidaan…</span>
+      </div>
+      <p class="muted" style="margin-top:1.2rem;">
+        Sivu käyttää cPoutan MariaDB:tä/ MySQL:ää: <code class="mono">SELECT 
+NOW()</code> → palautetaan JSON-rajapinnasta (<code 
+class="mono">dbtime.php</code>).
+        Kellon näyttö päivittyy sekunnin välein paikallisesti ja resynkkaa 
+palvelimen aikaan säännöllisesti.
+      </p>
+    </div>
+  </div>
   <script>
-    async function loadTime() {
-      const el = document.getElementById('dbtime');
+    /* ===== Matrix-tausta ===== */
+    (function matrix() {
+      const canvas = document.getElementById('matrix-canvas');
+      const ctx = canvas.getContext('2d');
+      let w, h, cols, drops, fontSize = 16;
+      const glyphs = '01 23456789'.split(''); // numeropainotteinen "sade"
+      function resize() {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+        cols = Math.floor(w / fontSize);
+        drops = Array(cols).fill(0).map(() => 
+Math.floor(Math.random()*h/fontSize));
+        ctx.font = fontSize + 'px monospace';
+      }
+      window.addEventListener('resize', resize, { passive: true });
+      resize();
+      function draw() {
+        // läpikuultava musta "haamu"jälki
+        ctx.fillStyle = 'rgba(0,0,0,0.08)';
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#00ff80';
+        for (let i = 0; i < cols; i++) {
+          const text = glyphs[Math.floor(Math.random() * glyphs.length)];
+          const x = i * fontSize;
+          const y = drops[i] * fontSize;
+          ctx.fillText(text, x, y);
+          // resetoi pudotus satunnaisesti pohjalla
+          if (y > h && Math.random() > 0.975) drops[i] = 0;
+          else drops[i]++;
+        }
+        requestAnimationFrame(draw);
+      }
+      requestAnimationFrame(draw);
+    })();
+    /* ===== SQL-aikaan synkattu digitaalinen kello ===== */
+    const clockEl = document.getElementById('clock');
+    const statusEl = document.getElementById('status');
+    let offsetMs = 0; // server_time - client_time
+    // Muotoilu HH:MM:SS
+    function fmt(n){ return n.toString().padStart(2,'0'); }
+    function render() {
+      const now = new Date(Date.now() + offsetMs);
+      const hh = fmt(now.getHours()), mm = fmt(now.getMinutes()), ss = 
+fmt(now.getSeconds());
+      clockEl.textContent = `${hh}:${mm}:${ss}`;
+    }
+    async function syncFromServer() {
       try {
+        statusEl.textContent = 'Synkronoidaan…';
         const res = await fetch('dbtime.php', { cache: 'no-store' });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
-        el.textContent = data.time ?? JSON.stringify(data);
-      } catch (err) {
-        el.textContent = 'Virhe kellonajassa: ' + err.message + ' (tee dbtime.php valmiiksi)';
+        // Jos dbtime.php palauttaa epoch_ms, käytä sitä tarkkaan synkkaan:
+        let serverMs;
+        if (typeof data.epoch_ms === 'number') {
+          serverMs = data.epoch_ms;
+        } else if (typeof data.time === 'string') {
+          // "YYYY-MM-DD HH:MM:SS" → tee siitä paikallinen aika
+          const t = data.time.replace(' ', 'T');
+          serverMs = new Date(t).getTime();
+        } else {
+          throw new Error('Odottamaton vastaus');
+        }
+        offsetMs = serverMs - Date.now();
+        statusEl.textContent = 'Synkronoitu';
+      } catch (e) {
+        statusEl.textContent = 'Synkka epäonnistui: ' + e.message;
       }
     }
-    document.getElementById('refresh').addEventListener('click', loadTime);
-    loadTime();
-  </script>
-</body>
-</html>
+    // Ensisynkka ja kellon päivitys
+    syncFromServer();
+    setInterval(render, 1000);
+    // Resynkkaa 2 minuutin välein
+    setInterval(syncFromServer, 120000);
+  </script> </body> </html>
